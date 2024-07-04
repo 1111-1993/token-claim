@@ -3,7 +3,7 @@ import React from 'react';
 // import ClaimForm from './components/ClaimForm';
 // import ClaimForm from './utils/change';
 // import ClaimForm from './utils/parity';
-import ClaimForm from './utils/main_change';
+import ClaimForm from './utils/change';
 
 function App() {
   return (
