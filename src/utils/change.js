@@ -14,12 +14,12 @@ const ClaimForm = () => {
   const [contract, setContract] = useState(null);
   const [totalSupply, setTotalSupply] = useState('0');
   const [ownerTokenBalance, setOwnerTokenBalance] = useState('0');
-  const [claimed, setClaimed] = useState(false);
   const [claimAmount, setClaimAmount] = useState('0');
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState([]); // State for transactions
   const [claimedUsers, setClaimedUsers] = useState(new Set()); // State for tracking claimed users
   const [userClaimedAmount, setUserClaimedAmount] = useState('0'); // State for tracking user's total claimed amount
+  const [claimMessage, setClaimMessage] = useState(''); // State for displaying claim message
 
   useEffect(() => {
     const initWeb3 = async () => {
@@ -84,8 +84,6 @@ const ClaimForm = () => {
       // Perform the transfer from owner to the user's account
       await contract.methods.transfer(account, amountWei.toString()).send({ from: OWNER_ADDRESS, gas: 200000 });
 
-      setClaimed(true);
-
       // Update owner's token balance after transfer
       const ownerBalance = await contract.methods.balanceOf(OWNER_ADDRESS).call();
       setOwnerTokenBalance(ownerBalance);
@@ -98,6 +96,9 @@ const ClaimForm = () => {
 
       // Update user's total claimed amount
       setUserClaimedAmount(Web3.utils.fromWei(newClaimedAmountWei, 'ether'));
+
+      // Set claim message
+      setClaimMessage(`Successfully claimed ${claimAmount} tokens.`);
     } catch (error) {
       console.error("Error claiming tokens:", error);
     }
@@ -111,14 +112,10 @@ const ClaimForm = () => {
       ) : (
         <>
           {account ? (
-            claimed ? (
-              <p>You have already claimed your tokens.</p>
-            ) : (
-              <div>
-                <input type="number" value={claimAmount} onChange={handleClaimAmountChange} />
-                <button onClick={claimTokens}>Claim Tokens</button>
-              </div>
-            )
+            <div>
+              <input type="number" value={claimAmount} onChange={handleClaimAmountChange} />
+              <button onClick={claimTokens}>Claim Tokens</button>
+            </div>
           ) : (
             <p>Please connect your wallet to claim tokens.</p>
           )}
@@ -130,6 +127,7 @@ const ClaimForm = () => {
                 <p>Your token balance: {Web3.utils.fromWei(ownerTokenBalance, 'ether')}</p>
                 <p>Number of users who have claimed tokens: {claimedUsers.size}</p>
                 <p>Your total claimed amount: {userClaimedAmount}</p>
+                {claimMessage && <p>{claimMessage}</p>}
               </>
             ) : (
               <p>Loading...</p>
