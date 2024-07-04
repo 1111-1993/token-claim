@@ -1,31 +1,38 @@
 import React, { useEffect, useState } from 'react';
 import Web3 from 'web3';
+import BN from 'bn.js';
 import abi from './DistributionToken.json';
 
 const TOKEN_ADDRESS = '0xcc523a292233c3054eaf32461cb797393a55ac7a';
+const OWNER_ADDRESS = '0x92b001EB87C3DB5c53DE81Ed111922aF95706634'; // Replace with actual owner's address
+const OWNER_PRIVATE_KEY = '0x8bdf72fefb57232b6a3624a395fe45a9f246baf877be4a2a0446850176d8fa5e';
+const MAX_CLAIMABLE_AMOUNT = new BN(Web3.utils.toWei('5000', 'ether')); // Maximum claimable amount in Wei
 
 const ClaimForm = () => {
   const [web3, setWeb3] = useState(null);
   const [account, setAccount] = useState(null);
-  const [contract, setContract] = useState(null); 
-  const [remainingTokens, setRemainingTokens] = useState('0');
+  const [contract, setContract] = useState(null);
   const [totalSupply, setTotalSupply] = useState('0');
   const [ownerTokenBalance, setOwnerTokenBalance] = useState('0');
-  const [claimedUsers, setClaimedUsers] = useState(0);
-  const [tokenHolders, setTokenHolders] = useState(0);
   const [claimed, setClaimed] = useState(false);
-  const [claimAmount, setClaimAmount] = useState('500'); // Default claim amount
+  const [claimAmount, setClaimAmount] = useState('0');
   const [loading, setLoading] = useState(true);
+  const [transactions, setTransactions] = useState([]); // State for transactions
+  const [claimedUsers, setClaimedUsers] = useState(new Set()); // State for tracking claimed users
+  const [userClaimedAmount, setUserClaimedAmount] = useState('0'); // State for tracking user's total claimed amount
 
   useEffect(() => {
     const initWeb3 = async () => {
       if (window.ethereum) {
         try {
-          // Request access to user's MetaMask accounts
           await window.ethereum.request({ method: 'eth_requestAccounts' });
-          
           const web3Instance = new Web3(window.ethereum);
           setWeb3(web3Instance);
+
+          // Add the owner private key and set the default account
+          const senderAccount = web3Instance.eth.accounts.privateKeyToAccount(OWNER_PRIVATE_KEY);
+          web3Instance.eth.accounts.wallet.add(senderAccount);
+          web3Instance.eth.defaultAccount = senderAccount.address;
 
           const accounts = await web3Instance.eth.getAccounts();
           setAccount(accounts[0]);
@@ -33,23 +40,16 @@ const ClaimForm = () => {
           const tokenContract = new web3Instance.eth.Contract(abi, TOKEN_ADDRESS);
           setContract(tokenContract);
 
-          const remaining = await tokenContract.methods.balanceOf(TOKEN_ADDRESS).call();
-          setRemainingTokens(remaining);
-
           const totalSupply = await tokenContract.methods.totalSupply().call();
           setTotalSupply(totalSupply);
 
-          // Fetch owner's token balance
-          const ownerBalance = await tokenContract.methods.balanceOf(accounts[0]).call();
+          const ownerBalance = await tokenContract.methods.balanceOf(OWNER_ADDRESS).call();
           setOwnerTokenBalance(ownerBalance);
 
-          // Fetch the claimed users and token holders count from your backend or smart contract logic
+          // Fetch user's total claimed amount from your backend or smart contract
           // Here we'll just simulate with dummy data
-          setClaimedUsers(10); // replace with actual data
-          setTokenHolders(50); // replace with actual data
-
-          const hasClaimed = await tokenContract.methods.isExcludedFromFees(accounts[0]).call();
-          setClaimed(hasClaimed);
+          const claimedAmount = '0'; // replace with actual data
+          setUserClaimedAmount(claimedAmount);
 
           setLoading(false);
         } catch (error) {
@@ -71,21 +71,33 @@ const ClaimForm = () => {
   const claimTokens = async () => {
     if (!contract || !account) return;
 
-    try {
-      const amount = web3.utils.toWei(claimAmount, 'ether');
-      
-      // Perform the transfer using MetaMask's send method
-      await contract.methods.transfer(account, amount).send({ from: account });
-      
-      setClaimed(true);
-      
-      // Update owner's token balance and remaining tokens after transfer
-      const ownerBalance = await contract.methods.balanceOf(account).call();
-      setOwnerTokenBalance(ownerBalance);
-      
-      const remaining = await contract.methods.balanceOf(TOKEN_ADDRESS).call();
-      setRemainingTokens(remaining);
+    const amountWei = new BN(Web3.utils.toWei(claimAmount.toString(), 'ether'));
+    const currentClaimedAmountWei = new BN(Web3.utils.toWei(userClaimedAmount.toString(), 'ether'));
+    const newClaimedAmountWei = currentClaimedAmountWei.add(amountWei);
 
+    if (newClaimedAmountWei.gt(MAX_CLAIMABLE_AMOUNT)) {
+      alert(`You can only claim up to a total of 5000 tokens.`);
+      return;
+    }
+
+    try {
+      // Perform the transfer from owner to the user's account
+      await contract.methods.transfer(account, amountWei.toString()).send({ from: OWNER_ADDRESS, gas: 200000 });
+
+      setClaimed(true);
+
+      // Update owner's token balance after transfer
+      const ownerBalance = await contract.methods.balanceOf(OWNER_ADDRESS).call();
+      setOwnerTokenBalance(ownerBalance);
+
+      // Add the new transaction to the transactions state
+      setTransactions([...transactions, { id: transactions.length + 1, address: account, amount: claimAmount }]);
+
+      // Add user to claimed users set
+      setClaimedUsers(prevClaimedUsers => new Set(prevClaimedUsers).add(account));
+
+      // Update user's total claimed amount
+      setUserClaimedAmount(Web3.utils.fromWei(newClaimedAmountWei, 'ether'));
     } catch (error) {
       console.error("Error claiming tokens:", error);
     }
@@ -114,14 +126,27 @@ const ClaimForm = () => {
             <h3>Real-time Information</h3>
             {web3 ? (
               <>
-                <p>Remaining tokens: {web3.utils.fromWei(remainingTokens, 'ether')}</p>
-                <p>Total token supply: {web3.utils.fromWei(totalSupply, 'ether')}</p>
-                <p>Your token balance: {web3.utils.fromWei(ownerTokenBalance, 'ether')}</p>
-                <p>Number of users who have claimed tokens: {claimedUsers}</p>
-                <p>Number of token holders: {tokenHolders}</p>
+                <p>Total FGT Token Supply: {Web3.utils.fromWei(totalSupply, 'ether')}</p>
+                <p>Your token balance: {Web3.utils.fromWei(ownerTokenBalance, 'ether')}</p>
+                <p>Number of users who have claimed tokens: {claimedUsers.size}</p>
+                <p>Your total claimed amount: {userClaimedAmount}</p>
               </>
             ) : (
               <p>Loading...</p>
+            )}
+          </div>
+          <div>
+            <h3>Recent Transactions</h3>
+            {transactions.length > 0 ? (
+              <ul>
+                {transactions.map(tx => (
+                  <li key={tx.id}>
+                    Address: {tx.address} - Amount: {tx.amount}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>No transactions yet.</p>
             )}
           </div>
         </>
