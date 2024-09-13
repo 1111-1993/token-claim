@@ -2,10 +2,9 @@ import React, { useEffect, useState } from 'react';
 import Web3 from 'web3';
 import BN from 'bn.js';
 import abi from './DistributionToken.json';
+import {TOKEN_ADDRESS, OWNER_ADDRESS, OWNER_PRIVATE_KEY} from './config'
 
-const TOKEN_ADDRESS = '0xcc523a292233c3054eaf32461cb797393a55ac7a';
-const OWNER_ADDRESS = '0x92b001EB87C3DB5c53DE81Ed111922aF95706634'; // Replace with actual owner's address
-const OWNER_PRIVATE_KEY = '0x8bdf72fefb57232b6a3624a395fe45a9f246baf877be4a2a0446850176d8fa5e';
+
 const MAX_CLAIMABLE_AMOUNT = new BN(Web3.utils.toWei('5000', 'ether')); // Maximum claimable amount in Wei
 
 const ClaimForm = () => {
