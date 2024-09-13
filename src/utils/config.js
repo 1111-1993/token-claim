@@ -1,0 +1,5 @@
+const TOKEN_ADDRESS = '';
+const OWNER_ADDRESS = ''; 
+const OWNER_PRIVATE_KEY = '';
+
+module.exports = {TOKEN_ADDRESS, OWNER_ADDRESS, OWNER_PRIVATE_KEY}
